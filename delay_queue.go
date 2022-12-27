@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"strconv"
 	"sync"
 	"time"
 
@@ -64,9 +62,6 @@ func GetDelayQueue(serviceBuilder BuildExecutor) *delayQueue {
 
 // singleton method use other persistence layer
 func GetDelayQueueWithPersis(serviceBuilder BuildExecutor, persistence Persistence) *delayQueue {
-	if persistence == nil {
-		log.Fatalf("persistance is null")
-	}
 	onceNew.Do(func() {
 		delayQueueInstance = &delayQueue{
 			Persistence:    persistence,
@@ -141,23 +136,6 @@ func (dq *delayQueue) init() {
 				}
 			}
 		}
-	}()
-
-	// async to update timewheel pointer
-	go func() {
-		// refresh pinter internal seconds
-		refreshInternal, _ := strconv.Atoi(GetEvnWithDefaultVal("REFRESH_POINTER_INTERNAL", fmt.Sprintf("%d", REFRESH_POINTER_DEFAULT_SECONDS)))
-		if refreshInternal < REFRESH_POINTER_DEFAULT_SECONDS {
-			refreshInternal = REFRESH_POINTER_DEFAULT_SECONDS
-		}
-		for {
-			select {
-			case <-time.After(time.Second * REFRESH_POINTER_DEFAULT_SECONDS):
-				err := dq.Persistence.SaveWheelTimePointer(int(dq.CurrentIndex))
-				log.Println(err)
-			}
-		}
-
 	}()
 }
 
@@ -252,8 +230,6 @@ func (dq *delayQueue) ExecuteTask(taskType, taskParams string) error {
 	if dq.TaskExecutor != nil {
 		executor := dq.TaskExecutor(taskType)
 		if executor != nil {
-			log.Printf("Execute task: %s with params: %s\n", taskType, taskParams)
-
 			return executor.DoDelayTask(taskParams)
 		} else {
 			return errors.New("executor is nil")
